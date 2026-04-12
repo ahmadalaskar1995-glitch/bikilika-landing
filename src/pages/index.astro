@@ -1,40 +1,14 @@
 ---
-import config from '../content/config.json';
-import fs from 'fs';
-import path from 'path';
-import matter from 'gray-matter';
+import { getSiteConfig, listProducts, listFooterPages } from '../lib/content.js';
 
-// 1. جلب المنتجات (نفس الطريقة السابقة)
-const productModules = import.meta.glob('../content/products/*.md', { eager: true });
-const products = Object.entries(productModules).map(([filePath, mod]: [string, any]) => {
-  const slug = filePath.split('/').pop()?.replace('.md', '') || '';
-  return {
-    slug,
-    data: mod.frontmatter,
-  };
-});
-
-// 2. جلب الصفحات الثابتة ديناميكيًا باستخدام fs
-const pagesDir = path.join(process.cwd(), 'src', 'content', 'pages');
-let footerPages: Array<{ slug: string; title: string }> = [];
-
-if (fs.existsSync(pagesDir)) {
-  const files = fs.readdirSync(pagesDir).filter(f => f.endsWith('.md'));
-  footerPages = files.map(file => {
-    const filePath = path.join(pagesDir, file);
-    const content = fs.readFileSync(filePath, 'utf-8');
-    const { data } = matter(content);
-    const slug = data.slug || file.replace('.md', '');
-    return {
-      slug,
-      title: data.title || slug,
-    };
-  }).filter(p => p.slug && p.title)
-    .sort((a, b) => {
-      const order = ['about-us', 'privacy-policy', 'contact-us'];
-      return order.indexOf(a.slug) - order.indexOf(b.slug);
-    });
-}
+const config = await getSiteConfig();
+const products = await listProducts();
+let footerPages = await listFooterPages();
+footerPages = footerPages.filter(p => p.slug && p.title)
+  .sort((a, b) => {
+    const order = ['about-us', 'privacy-policy', 'contact-us'];
+    return order.indexOf(a.slug) - order.indexOf(b.slug);
+  });
 ---
 
 <!DOCTYPE html>
