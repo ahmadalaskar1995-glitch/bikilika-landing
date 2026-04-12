@@ -1,21 +1,29 @@
 <!DOCTYPE html>
-<html>
+<html lang="ar">
 <head>
   <meta charset="UTF-8">
-  <title>Admin</title>
+  <title>لوحة التحكم</title>
   <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+  <style>
+    body { direction: rtl; background: #f1f5f9; margin: 0; }
+  </style>
 </head>
 <body>
   <script src="https://unpkg.com/decap-cms@^3.0.0/dist/decap-cms.js"></script>
   <script>
     if (window.netlifyIdentity) {
-      window.netlifyIdentity.on('init', user => {
+      window.netlifyIdentity.on('init', function(user) {
         if (!user) {
-          window.netlifyIdentity.on('login', () => {
+          window.netlifyIdentity.on('login', function() {
             document.location.href = '/admin/';
           });
         }
       });
+      
+      // هذا الجزء مهم جداً: يضمن أن رابط الدعوة يفتح في صفحة /admin/
+      if (window.location.hash.includes('invite_token')) {
+        window.location.href = '/admin/' + window.location.hash;
+      }
     }
   </script>
 </body>
