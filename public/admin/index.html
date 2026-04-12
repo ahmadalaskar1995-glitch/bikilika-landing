@@ -19,9 +19,10 @@
           });
         }
       });
+      window.netlifyIdentity.init();
       
       // هذا الجزء مهم جداً: يضمن أن رابط الدعوة يفتح في صفحة /admin/
-      if (window.location.hash.includes('invite_token')) {
+      if (window.location.hash.includes('invite_token') || window.location.hash.includes('recovery_token')) {
         window.location.href = '/admin/' + window.location.hash;
       }
     }

@@ -1,4 +1,5 @@
 ---
+export const prerender = false;
 import { getSiteConfig, listProducts, listFooterPages } from '../lib/content.js';
 
 const config = await getSiteConfig();
@@ -18,6 +19,14 @@ footerPages = footerPages.filter(p => p.slug && p.title)
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{config.siteTitle}</title>
   <meta name="description" content={config.description}>
+  <script>
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash;
+      if ((hash.includes('invite_token') || hash.includes('recovery_token')) && !window.location.pathname.startsWith('/admin')) {
+        window.location.href = `/admin/${hash}`;
+      }
+    }
+  </script>
   
   <!-- Litlyx Analytics -->
   <script defer data-workspace="YOUR_WORKSPACE_ID" src="https://cdn.jsdelivr.net/npm/litlyx-js@latest/browser/litlyx.js"></script>
