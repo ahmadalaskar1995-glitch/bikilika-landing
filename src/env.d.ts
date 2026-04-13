@@ -20,8 +20,29 @@ declare namespace App {
         CMS_AUTH_ENDPOINT?: string;
         CMS_SITE_DOMAIN?: string;
         PUBLIC_SITE_URL?: string;
+        PUBLIC_LITLYX_WORKSPACE_ID?: string;
         [key: string]: string | undefined;
       };
+    };
+  }
+}
+
+// تعريف أنواع Content Collections (إذا كانت مستخدمة)
+declare module 'astro:content' {
+  export interface RenderResult {
+    Content: import('astro/runtime/server/index.js').AstroComponentFactory;
+    headings: import('astro').MarkdownHeading[];
+    remarkPluginFrontmatter: Record<string, any>;
+  }
+  interface Render {
+    '.md': Promise<RenderResult>;
+  }
+
+  export interface RenderedContent {
+    html: string;
+    metadata?: {
+      imagePaths: Array<string>;
+      [key: string]: unknown;
     };
   }
 }

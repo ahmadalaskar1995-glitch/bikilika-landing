@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ar">
+<html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -283,6 +283,13 @@
     });
 
     observer.observe(document.body, { childList: true, subtree: true });
+
+    // إخفاء شريط البحث الافتراضي لـ Decap CMS إن وجد
+    const style = document.createElement('style');
+    style.textContent = `
+      [class*="SearchContainer"], [class*="QuickSearch"] { display: none !important; }
+    `;
+    document.head.appendChild(style);
   </script>
 </body>
 </html>

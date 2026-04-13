@@ -4,7 +4,10 @@ import { renderMarkdown } from '../../lib/markdown.js';
 
 export const prerender = false;
 
-const runtimeEnv = Astro.locals.runtime?.env;
+const runtimeEnv = (typeof process !== 'undefined' && process.env)
+  ? process.env
+  : (Astro.locals.runtime?.env || {});
+
 const config = await getSiteConfig(runtimeEnv);
 const { slug } = Astro.params;
 if (!slug) throw new Error('Missing page slug');

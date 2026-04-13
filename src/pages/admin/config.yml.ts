@@ -6,21 +6,28 @@ function yamlLine(key: string, value: string, indent = 0) {
 }
 
 function pickRuntimeEnv(locals: App.Locals | undefined) {
-  return locals?.runtime?.env ?? process.env;
+  // الوصول الآمن لمتغيرات البيئة حسب المنصة
+  if (locals?.runtime?.env) {
+    return locals.runtime.env;
+  }
+  if (typeof process !== 'undefined' && process.env) {
+    return process.env;
+  }
+  return {};
 }
 
 export function GET({ locals, url }: APIContext) {
   const env = pickRuntimeEnv(locals);
-  const repo = env.CMS_GITHUB_REPO || (
+  const repo = (env.CMS_GITHUB_REPO as string) || (
     env.CONTENT_REPO_OWNER && env.CONTENT_REPO_NAME
       ? `${env.CONTENT_REPO_OWNER}/${env.CONTENT_REPO_NAME}`
       : ''
   );
-  const branch = env.CMS_BRANCH || env.CONTENT_REPO_BRANCH || 'main';
-  const oauthBaseUrl = env.CMS_OAUTH_BASE_URL || '';
-  const authEndpoint = env.CMS_AUTH_ENDPOINT || 'auth';
-  const siteUrl = env.PUBLIC_SITE_URL || url.origin;
-  const siteDomain = env.CMS_SITE_DOMAIN || new URL(siteUrl).host;
+  const branch = (env.CMS_BRANCH as string) || (env.CONTENT_REPO_BRANCH as string) || 'main';
+  const oauthBaseUrl = (env.CMS_OAUTH_BASE_URL as string) || '';
+  const authEndpoint = (env.CMS_AUTH_ENDPOINT as string) || 'auth';
+  const siteUrl = (env.PUBLIC_SITE_URL as string) || url.origin;
+  const siteDomain = (env.CMS_SITE_DOMAIN as string) || new URL(siteUrl).host;
 
   const lines = [
     'local_backend: false',

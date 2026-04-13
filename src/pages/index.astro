@@ -4,20 +4,21 @@ import { renderMarkdown } from '../lib/markdown.js';
 
 export const prerender = false;
 
-const runtimeEnv = Astro.locals.runtime?.env;
+const runtimeEnv = (typeof process !== 'undefined' && process.env)
+  ? process.env
+  : (Astro.locals.runtime?.env || {});
+
 const config = await getSiteConfig(runtimeEnv);
 const products = await listProducts(runtimeEnv);
 let footerPages = await listFooterPages(runtimeEnv);
 const analyticsWorkspaceId = import.meta.env.PUBLIC_LITLYX_WORKSPACE_ID;
 
-// تحويل الأوصاف إلى HTML
 const productsWithHtml = await Promise.all(products.map(async (p) => {
   const html = await renderMarkdown(p.data.description || '', { siteTitle: config.siteTitle });
   return { ...p, descriptionHtml: html };
 }));
 
 footerPages = footerPages.filter(p => p.slug && p.title)
-
   .sort((a, b) => {
     const order = ['about-us', 'privacy-policy', 'contact-us'];
     return order.indexOf(a.slug) - order.indexOf(b.slug);
@@ -31,11 +32,13 @@ footerPages = footerPages.filter(p => p.slug && p.title)
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{config.siteTitle}</title>
   <meta name="description" content={config.description}>
-  <script>
+  
+  <script set:html={`const totalProducts = ${products.length};`}></script>
+   <script>
     if (typeof window !== 'undefined') {
       const hash = window.location.hash;
-            if (products.length > 1 && (hash.includes('invite_token') || hash.includes('recovery_token'))) {
-
+      const totalProducts = parseInt(document.body.dataset.productsCount || '0');
+      if (totalProducts > 1 && (hash.includes('invite_token') || hash.includes('recovery_token'))) {
         window.location.href = `/admin/${hash}`;
       }
     }
@@ -44,7 +47,6 @@ footerPages = footerPages.filter(p => p.slug && p.title)
   {analyticsWorkspaceId && (
     <script is:inline defer data-workspace={analyticsWorkspaceId} src="https://cdn.jsdelivr.net/npm/litlyx-js@latest/browser/litlyx.js"></script>
   )}
-  
   <style>
     /* ===== إعادة تعيين ===== */
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -626,7 +628,7 @@ footerPages = footerPages.filter(p => p.slug && p.title)
           <section class="hero-slider-section">
             <div class="slider-viewport" id="hero-slider">
               <div class="slider-track" id="slider-track">
-                                {productsWithHtml.map((product) => {
+                {productsWithHtml.map((product) => {
                   const firstImage = product.data.images?.[0] || product.data.image || null;
                   return (
                     <div class="slider-slide">
@@ -652,7 +654,6 @@ footerPages = footerPages.filter(p => p.slug && p.title)
                     </div>
                   );
                 })}
-
               </div>
             </div>
 
@@ -745,20 +746,20 @@ footerPages = footerPages.filter(p => p.slug && p.title)
   <!-- سكريبت السلايدر -->
   <script>
     (function() {
-      const track = document.getElementById('slider-track');
-      const prevBtn = document.getElementById('hero-prev');
-      const nextBtn = document.getElementById('hero-next');
+      const track = document.getElementById('slider-track') as HTMLElement | null;
+      const prevBtn = document.getElementById('hero-prev') as HTMLButtonElement | null;
+      const nextBtn = document.getElementById('hero-next') as HTMLButtonElement | null;
       const dots = document.querySelectorAll<HTMLElement>('.dot');
       
       if (!track || !prevBtn || !nextBtn || dots.length === 0) return;
       const sliderTrack = track;
 
-      const totalSlides = dots.length;
-      let currentIndex = 0;
+      const totalSlides: number = dots.length;
+      let currentIndex: number = 0;
       let autoplayTimer: ReturnType<typeof setInterval> | null = null;
-      const AUTOPLAY_INTERVAL = 4500;
+      const AUTOPLAY_INTERVAL: number = 4500;
 
-      function updateSlider(index: number) {
+      function updateSlider(index: number): void {
         if (index < 0) index = totalSlides - 1;
         if (index >= totalSlides) index = 0;
         currentIndex = index;
@@ -770,14 +771,14 @@ footerPages = footerPages.filter(p => p.slug && p.title)
         });
       }
 
-      function nextSlide() { updateSlider(currentIndex + 1); }
-      function prevSlide() { updateSlider(currentIndex - 1); }
+      function nextSlide(): void { updateSlider(currentIndex + 1); }
+      function prevSlide(): void { updateSlider(currentIndex - 1); }
 
-      function startAutoplay() {
+      function startAutoplay(): void {
         stopAutoplay();
         autoplayTimer = setInterval(nextSlide, AUTOPLAY_INTERVAL);
       }
-      function stopAutoplay() {
+      function stopAutoplay(): void {
         if (autoplayTimer) {
           clearInterval(autoplayTimer);
           autoplayTimer = null;
@@ -798,8 +799,8 @@ footerPages = footerPages.filter(p => p.slug && p.title)
       }
 
       // دعم اللمس
-      let touchStartX = 0;
-      let touchEndX = 0;
+      let touchStartX: number = 0;
+      let touchEndX: number = 0;
       const viewport = document.querySelector('.slider-viewport');
       if (viewport) {
         viewport.addEventListener('touchstart', (e: Event) => {
@@ -814,8 +815,8 @@ footerPages = footerPages.filter(p => p.slug && p.title)
           startAutoplay();
         });
       }
-      function handleSwipe() {
-        const threshold = 50;
+      function handleSwipe(): void {
+        const threshold: number = 50;
         if (touchEndX < touchStartX - threshold) nextSlide();
         else if (touchEndX > touchStartX + threshold) prevSlide();
       }
@@ -827,13 +828,12 @@ footerPages = footerPages.filter(p => p.slug && p.title)
   <!-- تتبع النقرات على أزرار الشراء -->
   <script>
     document.addEventListener('DOMContentLoaded', function() {
-      const buyButtons = document.querySelectorAll('.btn-buy-hero, .btn-buy-mini');
+      const buyButtons = document.querySelectorAll<HTMLElement>('.btn-buy-hero, .btn-buy-mini');
       buyButtons.forEach(btn => {
         const productName = btn.getAttribute('data-product') || 'unknown';
         btn.addEventListener('click', () => {
-          const lit = window.Lit;
-          if (lit) {
-            lit.event('click_on_buy', {
+          if (typeof window.Lit !== 'undefined') {
+            window.Lit.event('click_on_buy', {
               metadata: {
                 'product': productName,
                 'page': window.location.pathname
@@ -843,21 +843,21 @@ footerPages = footerPages.filter(p => p.slug && p.title)
         });
       });
 
-      const ratingStorageKey = 'bikilika_rating_data';
+      const ratingStorageKey: string = 'bikilika_rating_data';
       const ratingSummary = document.getElementById('rating-summary');
       const ratingStars = document.querySelectorAll<HTMLButtonElement>('#rating-stars button');
       const ratingThanks = document.getElementById('rating-thanks');
 
-      function getRatingData() {
+      function getRatingData(): { total: number; count: number } {
         const stored = window.localStorage.getItem(ratingStorageKey);
         return stored ? JSON.parse(stored) : { total: 0, count: 0 };
       }
 
-      function saveRatingData(data: { total: number; count: number }) {
+      function saveRatingData(data: { total: number; count: number }): void {
         window.localStorage.setItem(ratingStorageKey, JSON.stringify(data));
       }
 
-      function updateRatingDisplay(data: { total: number; count: number }) {
+      function updateRatingDisplay(data: { total: number; count: number }): void {
         const average = data.count ? (data.total / data.count).toFixed(1) : '0.0';
         if (ratingSummary) {
           ratingSummary.textContent = `${average} من 5 (${data.count} تقييم)`;

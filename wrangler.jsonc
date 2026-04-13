@@ -1,10 +1,14 @@
 {
-  "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "bikilika-landing",
-  "compatibility_date": "2024-11-01",
-  "compatibility_flags": ["nodejs_compat"],
-  "assets": {
-    "directory": "./dist",
-    "not_found_handling": "404-page"
+  "main": "./dist/_worker.js",
+  "compatibility_date": "2025-04-13",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "vars": {
+    "CONTENT_REPO_OWNER": "ahmadalaskar1995-glitch",
+    "CONTENT_REPO_NAME": "bikilika-landing",
+    "CMS_OAUTH_BASE_URL": "https://bikilika-landing.ahmadalaskar1995.workers.dev",
+    "CMS_SITE_DOMAIN": "https://bikilika-landing.pages.dev"
   }
 }

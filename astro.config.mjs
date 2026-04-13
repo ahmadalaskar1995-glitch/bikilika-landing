@@ -3,7 +3,7 @@ import { defineConfig } from 'astro/config';
 import cloudflare from '@astrojs/cloudflare';
 
 export default defineConfig({
-  site: process.env.URL || 'http://localhost:4321',
+  site: process.env.CMS_SITE_DOMAIN || process.env.URL || 'http://localhost:4321',
   output: 'server',
   adapter: cloudflare(),
 });

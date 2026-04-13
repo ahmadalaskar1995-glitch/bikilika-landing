@@ -1,4 +1,6 @@
 import matter from 'gray-matter';
+// Cloudflare Workers environment
+import { env as cloudflareEnv } from 'cloudflare:workers';
 
 /** @typedef {Record<string, string | undefined>} RuntimeEnv */
 
@@ -6,7 +8,7 @@ import matter from 'gray-matter';
  * @param {RuntimeEnv | undefined} runtimeEnv
  */
 function resolveContentEnv(runtimeEnv = undefined) {
-  const env = runtimeEnv || process.env;
+  const env = runtimeEnv || (typeof process !== 'undefined' && process.env ? process.env : cloudflareEnv);
 
   return {
     repoOwner: env.CONTENT_REPO_OWNER,
@@ -86,11 +88,14 @@ async function readTextFile(filePath, runtimeEnv = undefined) {
     );
   }
 
-  // تحذير: هذا الكود سيعمل فقط في بيئة Node.js المحلية أثناء التطوير
-  // سنقوم باستيراد fs ديناميكياً لتجنب مشاكل Build في Cloudflare
-  const fs = await import('node:fs');
-  const path = await import('node:path');
-  return fs.readFileSync(path.join(process.cwd(), filePath), 'utf-8');
+  // محاولة استيراد fs فقط في بيئة Node.js
+  try {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    return fs.readFileSync(path.join(process.cwd(), filePath), 'utf-8');
+  } catch {
+    throw new Error('File system not available and GitHub config missing.');
+  }
 }
 
 /**
@@ -112,21 +117,24 @@ async function listDirectoryFiles(dirPath, runtimeEnv = undefined) {
     throw new Error('Cloudflare runtime requires GitHub config for directory listing.');
   }
 
-  const fs = await import('node:fs');
-  const path = await import('node:path');
-  const dir = path.join(process.cwd(), dirPath);
-  if (!fs.existsSync(dir)) {
-    return [];
+  try {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const dir = path.join(process.cwd(), dirPath);
+    if (!fs.existsSync(dir)) {
+      return [];
+    }
+    return fs.readdirSync(dir)
+      .filter((name) => name.endsWith('.md'))
+      .map((name) => ({
+        name,
+        path: path.join(dirPath, name),
+        download_url: null,
+      }));
+  } catch {
+    throw new Error('File system not available and GitHub config missing.');
   }
-  return fs.readdirSync(dir)
-    .filter((name) => name.endsWith('.md'))
-    .map((name) => ({
-      name,
-      path: path.join(dirPath, name),
-      download_url: null,
-    }));
 }
-// ... existing code ...
 
 function getSlugFromFileName(name) {
   return name.replace(/\.md$/, '');
