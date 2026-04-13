@@ -1,17 +1,26 @@
 ---
+import { getSiteConfig, getProductBySlug } from '../../lib/content.js';
+import { renderMarkdown } from '../../lib/markdown.js';
+
 export const prerender = false;
 
-import { getSiteConfig, getProductBySlug } from '../../lib/content.js';
-
 const { slug } = Astro.params;
-const productEntry = await getProductBySlug(slug);
-if (!productEntry) {
-  throw Astro.redirect('/404');
-}
+if (!slug) throw new Error('Missing product slug');
+const runtimeEnv = Astro.locals.runtime?.env;
+const productEntry = await getProductBySlug(slug, runtimeEnv);
+if (!productEntry) throw new Error(`Product not found: ${slug}`);
 
 const product = productEntry.data;
-const config = await getSiteConfig();
+const config = await getSiteConfig(runtimeEnv);
 const siteConfig = config;
+const productBodyHtml = await renderMarkdown(productEntry.body || '', {
+  siteTitle: siteConfig.siteTitle,
+  email: siteConfig.email,
+  whatsapp: siteConfig.whatsapp,
+  productTitle: product.title,
+  price: product.price,
+});
+const analyticsWorkspaceId = import.meta.env.PUBLIC_LITLYX_WORKSPACE_ID;
 
 // تجهيز مصفوفة الصور
 const images = product.images?.length ? product.images : (product.image ? [product.image] : []);
@@ -41,12 +50,12 @@ const productSchema = {
   <title>{product?.title || 'منتج'} | {siteConfig.siteTitle}</title>
   <meta name="description" content={product?.description || siteConfig.description}>
   
-  <!-- Litlyx Analytics -->
-  <script defer data-workspace="YOUR_WORKSPACE_ID" src="https://cdn.jsdelivr.net/npm/litlyx-js@latest/browser/litlyx.js"></script>
+  {analyticsWorkspaceId && (
+    <script is:inline defer data-workspace={analyticsWorkspaceId} src="https://cdn.jsdelivr.net/npm/litlyx-js@latest/browser/litlyx.js"></script>
+  )}
   
   <!-- SEO Schema -->
-  <script type="application/ld+json">
-    {JSON.stringify(productSchema)}
+  <script is:inline type="application/ld+json" set:html={JSON.stringify(productSchema)}>
   </script>
 
   <style>
@@ -114,6 +123,20 @@ const productSchema = {
     .product-title { font-size: 2.5rem; font-weight: 800; color: #111827; margin: 20px 0 10px; }
     .product-price { font-size: 2.2rem; font-weight: 700; color: #059669; margin: 15px 0; display: inline-block; background: #ecfdf5; padding: 6px 24px; border-radius: 40px; }
     .product-description { font-size: 1.2rem; color: #4b5563; line-height: 1.8; margin: 20px 0; }
+    .product-body {
+      margin-top: 24px;
+      padding-top: 24px;
+      border-top: 1px solid #e5e7eb;
+      color: #334155;
+      line-height: 1.9;
+    }
+    .product-body h2,
+    .product-body h3 { color: #111827; margin: 18px 0 12px; }
+    .product-body p,
+    .product-body ul,
+    .product-body ol { margin-bottom: 16px; }
+    .product-body ul,
+    .product-body ol { padding-inline-start: 22px; }
     .buy-button {
       display: inline-block; background: linear-gradient(145deg, #f97316, #ea580c);
       color: white; text-decoration: none; padding: 16px 36px; border-radius: 60px;
@@ -190,6 +213,7 @@ const productSchema = {
           <h2 class="product-title">{product.title}</h2>
           <div class="product-price">{product.price}</div>
           <div class="product-description">{product.description || ''}</div>
+          {productBodyHtml && <div class="product-body" set:html={productBodyHtml} />}
           <a href={product.bikilikaLink} class="buy-button" target="_blank" rel="noopener" data-product={product.title}>
             🛒 اشتر الآن
           </a>
@@ -225,12 +249,13 @@ const productSchema = {
   <!-- سكريبت السلايدر -->
   <script>
     (function() {
-      const wrapper = document.getElementById('slider-wrapper') as HTMLElement | null;
-      const prevBtn = document.getElementById('prevBtn') as HTMLButtonElement | null;
-      const nextBtn = document.getElementById('nextBtn') as HTMLButtonElement | null;
-      const dots = document.querySelectorAll('.dot');
+      const wrapper = document.getElementById('slider-wrapper');
+      const prevBtn = document.getElementById('prevBtn');
+      const nextBtn = document.getElementById('nextBtn');
+      const dots = document.querySelectorAll<HTMLElement>('.dot');
       
       if (!wrapper || !prevBtn || !nextBtn || dots.length === 0) return;
+      const sliderWrapper = wrapper;
 
       let currentIndex = 0;
       const totalSlides = dots.length;
@@ -241,7 +266,7 @@ const productSchema = {
         if (index < 0) index = 0;
         if (index >= totalSlides) index = totalSlides - 1;
         currentIndex = index;
-        (wrapper as HTMLElement).style.transform = `translateX(${-currentIndex * 100}%)`;
+        sliderWrapper.style.transform = `translateX(${-currentIndex * 100}%)`;
         dots.forEach((dot, i) => dot.classList.toggle('active', i === currentIndex));
       }
 
@@ -268,8 +293,8 @@ const productSchema = {
 
         // دعم اللمس
         let touchStartX = 0, touchEndX = 0;
-        slider.addEventListener('touchstart', (e) => { touchStartX = e.changedTouches[0].screenX; stopAutoplay(); }, {passive: true});
-        slider.addEventListener('touchend', (e) => {
+        slider.addEventListener('touchstart', (e: TouchEvent) => { touchStartX = e.changedTouches[0].screenX; stopAutoplay(); }, {passive: true});
+        slider.addEventListener('touchend', (e: TouchEvent) => {
           touchEndX = e.changedTouches[0].screenX;
           const threshold = 50;
           if (touchEndX < touchStartX - threshold) nextSlide();
@@ -287,11 +312,13 @@ const productSchema = {
     document.addEventListener('DOMContentLoaded', function() {
       const buyBtn = document.querySelector('.buy-button');
       if (buyBtn) {
-        buyBtn.addEventListener('click', function(this: HTMLElement) {
-          if (typeof (window as any).Lit !== 'undefined') {
-            (window as any).Lit.event('click_on_buy', {
+        const productName = buyBtn.getAttribute('data-product') || 'unknown';
+        buyBtn.addEventListener('click', () => {
+          const lit = window.Lit;
+          if (lit) {
+            lit.event('click_on_buy', {
               metadata: {
-                'product': this.getAttribute('data-product') || 'unknown',
+                'product': productName,
                 'page': window.location.pathname
               }
             });

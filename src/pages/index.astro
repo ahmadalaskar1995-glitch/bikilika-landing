@@ -1,10 +1,13 @@
 ---
-export const prerender = false;
 import { getSiteConfig, listProducts, listFooterPages } from '../lib/content.js';
 
-const config = await getSiteConfig();
-const products = await listProducts();
-let footerPages = await listFooterPages();
+export const prerender = false;
+
+const runtimeEnv = Astro.locals.runtime?.env;
+const config = await getSiteConfig(runtimeEnv);
+const products = await listProducts(runtimeEnv);
+let footerPages = await listFooterPages(runtimeEnv);
+const analyticsWorkspaceId = import.meta.env.PUBLIC_LITLYX_WORKSPACE_ID;
 footerPages = footerPages.filter(p => p.slug && p.title)
   .sort((a, b) => {
     const order = ['about-us', 'privacy-policy', 'contact-us'];
@@ -28,8 +31,9 @@ footerPages = footerPages.filter(p => p.slug && p.title)
     }
   </script>
   
-  <!-- Litlyx Analytics -->
-  <script defer data-workspace="YOUR_WORKSPACE_ID" src="https://cdn.jsdelivr.net/npm/litlyx-js@latest/browser/litlyx.js"></script>
+  {analyticsWorkspaceId && (
+    <script is:inline defer data-workspace={analyticsWorkspaceId} src="https://cdn.jsdelivr.net/npm/litlyx-js@latest/browser/litlyx.js"></script>
+  )}
   
   <style>
     /* ===== إعادة تعيين ===== */
@@ -733,13 +737,14 @@ footerPages = footerPages.filter(p => p.slug && p.title)
       const track = document.getElementById('slider-track');
       const prevBtn = document.getElementById('hero-prev');
       const nextBtn = document.getElementById('hero-next');
-      const dots = document.querySelectorAll('.dot');
+      const dots = document.querySelectorAll<HTMLElement>('.dot');
       
       if (!track || !prevBtn || !nextBtn || dots.length === 0) return;
+      const sliderTrack = track;
 
       const totalSlides = dots.length;
       let currentIndex = 0;
-      let autoplayTimer: NodeJS.Timeout | null = null;
+      let autoplayTimer: ReturnType<typeof setInterval> | null = null;
       const AUTOPLAY_INTERVAL = 4500;
 
       function updateSlider(index: number) {
@@ -747,9 +752,7 @@ footerPages = footerPages.filter(p => p.slug && p.title)
         if (index >= totalSlides) index = 0;
         currentIndex = index;
         
-        if (track) {
-          track.style.transform = `translateX(${-currentIndex * 100}%)`;
-        }
+        sliderTrack.style.transform = `translateX(${-currentIndex * 100}%)`;
         
         dots.forEach((dot, i) => {
           dot.classList.toggle('active', i === currentIndex);
@@ -812,20 +815,16 @@ footerPages = footerPages.filter(p => p.slug && p.title)
 
   <!-- تتبع النقرات على أزرار الشراء -->
   <script>
-    declare global {
-      interface Window {
-        Lit?: { event: (name: string, data: any) => void };
-      }
-    }
-
     document.addEventListener('DOMContentLoaded', function() {
       const buyButtons = document.querySelectorAll('.btn-buy-hero, .btn-buy-mini');
       buyButtons.forEach(btn => {
-        btn.addEventListener('click', function(this: HTMLElement) {
-          if (typeof window.Lit !== 'undefined') {
-            window.Lit.event('click_on_buy', {
+        const productName = btn.getAttribute('data-product') || 'unknown';
+        btn.addEventListener('click', () => {
+          const lit = window.Lit;
+          if (lit) {
+            lit.event('click_on_buy', {
               metadata: {
-                'product': this.getAttribute('data-product') || 'unknown',
+                'product': productName,
                 'page': window.location.pathname
               }
             });
@@ -858,13 +857,14 @@ footerPages = footerPages.filter(p => p.slug && p.title)
         });
       }
 
-      const ratingData = getRatingData();
+      let ratingData = getRatingData();
       updateRatingDisplay(ratingData);
 
       ratingStars.forEach((btn) => {
-        btn.addEventListener('click', function(this: HTMLButtonElement) {
-          const value = Number(this.dataset.value);
+        btn.addEventListener('click', () => {
+          const value = Number(btn.dataset.value);
           const newData = { total: ratingData.total + value, count: ratingData.count + 1 };
+          ratingData = newData;
           saveRatingData(newData);
           updateRatingDisplay(newData);
           if (ratingThanks) {

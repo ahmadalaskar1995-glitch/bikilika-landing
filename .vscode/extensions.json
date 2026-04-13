@@ -1,4 +1,8 @@
 {
-  "recommendations": ["astro-build.astro-vscode"],
+  "recommendations": [
+    "astro-build.astro-vscode",
+    "rooveterinaryinc.roo-cline",
+    "continue.continue"
+  ],
   "unwantedRecommendations": []
 }

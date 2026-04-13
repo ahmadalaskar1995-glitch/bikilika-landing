@@ -2,30 +2,287 @@
 <html lang="ar">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>لوحة التحكم</title>
-  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
   <style>
-    body { direction: rtl; background: #f1f5f9; margin: 0; }
+    :root {
+      --bg: #f8fafc;
+      --panel: rgba(255, 255, 255, 0.84);
+      --text: #0f172a;
+      --muted: #475569;
+      --brand: #f97316;
+      --brand-2: #ec4899;
+      --line: rgba(148, 163, 184, 0.25);
+      --shadow: 0 30px 60px rgba(15, 23, 42, 0.16);
+    }
+
+    * { box-sizing: border-box; }
+    html, body { min-height: 100%; }
+    body {
+      direction: rtl;
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top right, rgba(249, 115, 22, 0.16), transparent 28%),
+        radial-gradient(circle at left center, rgba(236, 72, 153, 0.14), transparent 32%),
+        linear-gradient(180deg, #fff7ed 0%, var(--bg) 32%, #eef2ff 100%);
+    }
+
+    .admin-shell {
+      position: relative;
+      padding: 24px;
+      min-height: 100vh;
+    }
+
+    .admin-topbar {
+      position: sticky;
+      top: 16px;
+      z-index: 30;
+      max-width: 1200px;
+      margin: 0 auto 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 16px 20px;
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      background: var(--panel);
+      backdrop-filter: blur(16px);
+      box-shadow: var(--shadow);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .brand-badge {
+      width: 48px;
+      height: 48px;
+      border-radius: 16px;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--brand), var(--brand-2));
+      box-shadow: 0 16px 32px rgba(249, 115, 22, 0.28);
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 1.1rem;
+    }
+
+    .brand p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .admin-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .admin-button {
+      appearance: none;
+      border: 0;
+      border-radius: 999px;
+      padding: 12px 18px;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: none;
+      transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+    }
+
+    .admin-button:hover {
+      transform: translateY(-2px);
+    }
+
+    .admin-button.primary {
+      color: #fff;
+      background: linear-gradient(135deg, var(--brand), #ea580c);
+      box-shadow: 0 16px 28px rgba(249, 115, 22, 0.28);
+    }
+
+    .admin-button.secondary {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.86);
+      border: 1px solid var(--line);
+    }
+
+    .admin-stage {
+      max-width: 1200px;
+      margin: 0 auto;
+      position: relative;
+    }
+
+    .admin-welcome {
+      margin-bottom: 20px;
+      padding: 28px;
+      border-radius: 28px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      backdrop-filter: blur(14px);
+      box-shadow: var(--shadow);
+    }
+
+    .admin-welcome h2 {
+      margin: 0 0 10px;
+      font-size: clamp(1.6rem, 2vw, 2.2rem);
+    }
+
+    .admin-welcome p {
+      margin: 0;
+      max-width: 760px;
+      color: var(--muted);
+      line-height: 1.8;
+    }
+
+    .admin-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+      margin-top: 22px;
+    }
+
+    .admin-card {
+      padding: 18px;
+      border-radius: 22px;
+      background: rgba(255, 255, 255, 0.76);
+      border: 1px solid var(--line);
+    }
+
+    .admin-card strong {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 1rem;
+    }
+
+    .admin-card span {
+      color: var(--muted);
+      font-size: 0.94rem;
+      line-height: 1.7;
+    }
+
+    #cms-root,
+    #nc-root {
+      min-height: 65vh;
+    }
+
+    .admin-loading {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 20px 0 0;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .admin-loading::before {
+      content: "";
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      border: 3px solid rgba(249, 115, 22, 0.18);
+      border-top-color: var(--brand);
+      animation: spin 0.85s linear infinite;
+    }
+
+    body.cms-ready .admin-welcome {
+      display: none;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    @media (max-width: 900px) {
+      .admin-grid { grid-template-columns: 1fr; }
+      .admin-topbar {
+        position: static;
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .admin-actions { justify-content: stretch; }
+      .admin-button { text-align: center; width: 100%; }
+    }
   </style>
 </head>
 <body>
+  <div class="admin-shell">
+    <div class="admin-topbar">
+      <div class="brand">
+        <div class="brand-badge">CMS</div>
+        <div>
+          <h1>لوحة التحكم</h1>
+          <p>إدارة المنتجات والصفحات وإعدادات المتجر من مكان واحد.</p>
+        </div>
+      </div>
+
+      <div class="admin-actions">
+        <button class="admin-button primary" id="admin-login" type="button">تسجيل الدخول</button>
+        <a class="admin-button secondary" href="/" target="_blank" rel="noopener">فتح الموقع</a>
+      </div>
+    </div>
+
+    <div class="admin-stage">
+      <section class="admin-welcome" id="admin-welcome">
+        <h2>مساحة إدارة عربية أوضح وأرتب</h2>
+        <p>
+          يمكنك من هنا تحديث المنتجات، تعديل الصفحات التعريفية، وتغيير بيانات التواصل والهوية البصرية.
+          بعد تسجيل الدخول عبر GitHub ستظهر لوحة التحرير مباشرة داخل هذه الصفحة على Cloudflare Pages.
+        </p>
+
+        <div class="admin-grid">
+          <div class="admin-card">
+            <strong>المنتجات</strong>
+            <span>إضافة وتعديل روابط الشراء والأسعار والصور والسلايدر لكل منتج.</span>
+          </div>
+          <div class="admin-card">
+            <strong>الصفحات</strong>
+            <span>إدارة صفحات من نحن وسياسة الخصوصية والتواصل من نفس لوحة التحكم.</span>
+          </div>
+          <div class="admin-card">
+            <strong>الإعدادات</strong>
+            <span>تحديث اسم الموقع والوصف ووسائل التواصل دون الحاجة لتعديل الكود.</span>
+          </div>
+        </div>
+
+        <div class="admin-loading">جارٍ تحميل نظام الإدارة...</div>
+      </section>
+
+      <div id="cms-root"></div>
+    </div>
+  </div>
+
   <script src="https://unpkg.com/decap-cms@^3.0.0/dist/decap-cms.js"></script>
   <script>
-    if (window.netlifyIdentity) {
-      window.netlifyIdentity.on('init', function(user) {
-        if (!user) {
-          window.netlifyIdentity.on('login', function() {
-            document.location.href = '/admin/';
-          });
-        }
-      });
-      window.netlifyIdentity.init();
-      
-      // هذا الجزء مهم جداً: يضمن أن رابط الدعوة يفتح في صفحة /admin/
-      if (window.location.hash.includes('invite_token') || window.location.hash.includes('recovery_token')) {
-        window.location.href = '/admin/' + window.location.hash;
-      }
+    const loginButton = document.getElementById('admin-login');
+
+    function markReady() {
+      document.body.classList.add('cms-ready');
     }
+
+    if (loginButton) {
+      loginButton.addEventListener('click', function () {
+        window.location.hash = '#/login';
+      });
+    }
+
+    const observer = new MutationObserver(function () {
+      if (document.getElementById('nc-root')) {
+        markReady();
+      }
+    });
+
+    observer.observe(document.body, { childList: true, subtree: true });
   </script>
 </body>
 </html>

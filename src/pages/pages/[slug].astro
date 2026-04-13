@@ -1,31 +1,23 @@
 ---
+import { getSiteConfig, getPageBySlug } from '../../lib/content.js';
+import { renderMarkdown } from '../../lib/markdown.js';
+
 export const prerender = false;
 
-import { unified } from 'unified';
-import remarkParse from 'remark-parse';
-import remarkRehype from 'remark-rehype';
-import rehypeStringify from 'rehype-stringify';
-import { getSiteConfig, getPageBySlug } from '../../lib/content.js';
-
-const config = await getSiteConfig();
+const runtimeEnv = Astro.locals.runtime?.env;
+const config = await getSiteConfig(runtimeEnv);
 const { slug } = Astro.params;
-const pageEntry = await getPageBySlug(slug);
-if (!pageEntry) {
-  throw Astro.redirect('/404');
-}
+if (!slug) throw new Error('Missing page slug');
+const pageEntry = await getPageBySlug(slug, runtimeEnv);
+if (!pageEntry) throw new Error(`Page not found: ${slug}`);
 
 const pageData = pageEntry.data;
 const pageContent = pageEntry.body || '';
-
-const pageHtml = pageContent
-  ? String(
-      await unified()
-        .use(remarkParse as any)
-        .use(remarkRehype as any)
-        .use(rehypeStringify as any)
-        .process(pageContent)
-    )
-  : '';
+const pageHtml = await renderMarkdown(pageContent, {
+  siteTitle: config.siteTitle,
+  email: config.email,
+  whatsapp: config.whatsapp,
+});
 ---
 
 <!DOCTYPE html>

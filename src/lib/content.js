@@ -2,33 +2,61 @@ import fs from 'fs';
 import path from 'path';
 import matter from 'gray-matter';
 
-const repoOwner = process.env.CONTENT_REPO_OWNER;
-const repoName = process.env.CONTENT_REPO_NAME;
-const repoBranch = process.env.CONTENT_REPO_BRANCH || 'main';
-const githubToken = process.env.GITHUB_TOKEN;
-const useGitHub = Boolean(repoOwner && repoName);
 const localRoot = process.cwd();
+/** @typedef {Record<string, string | undefined>} RuntimeEnv */
 
-function githubHeaders() {
+/**
+ * @param {RuntimeEnv | undefined} runtimeEnv
+ */
+function resolveContentEnv(runtimeEnv = undefined) {
+  const env = runtimeEnv || process.env;
+
+  return {
+    repoOwner: env.CONTENT_REPO_OWNER,
+    repoName: env.CONTENT_REPO_NAME,
+    repoBranch: env.CONTENT_REPO_BRANCH || 'main',
+    githubToken: env.GITHUB_TOKEN,
+  };
+}
+
+/**
+ * @param {{ repoOwner?: string, repoName?: string }} contentEnv
+ */
+function isGitHubEnabled(contentEnv) {
+  return Boolean(contentEnv.repoOwner && contentEnv.repoName);
+}
+
+/**
+ * @param {{ githubToken?: string }} contentEnv
+ */
+function githubHeaders(contentEnv) {
   const headers = { Accept: 'application/vnd.github+json' };
-  if (githubToken) {
-    headers.Authorization = `Bearer ${githubToken}`;
+  if (contentEnv.githubToken) {
+    headers.Authorization = `Bearer ${contentEnv.githubToken}`;
   }
   return headers;
 }
 
-async function githubApi(pathname) {
-  const url = `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${pathname}?ref=${repoBranch}`;
-  const res = await fetch(url, { headers: githubHeaders() });
+/**
+ * @param {string} pathname
+ * @param {{ repoOwner?: string, repoName?: string, repoBranch: string, githubToken?: string }} contentEnv
+ */
+async function githubApi(pathname, contentEnv) {
+  const url = `https://api.github.com/repos/${contentEnv.repoOwner}/${contentEnv.repoName}/contents/${pathname}?ref=${contentEnv.repoBranch}`;
+  const res = await fetch(url, { headers: githubHeaders(contentEnv) });
   if (!res.ok) {
     throw new Error(`GitHub API failed ${res.status}: ${res.statusText}`);
   }
   return res.json();
 }
 
-async function githubRaw(pathname) {
-  const url = `https://raw.githubusercontent.com/${repoOwner}/${repoName}/${repoBranch}/${pathname}`;
-  const res = await fetch(url, { headers: githubHeaders() });
+/**
+ * @param {string} pathname
+ * @param {{ repoOwner?: string, repoName?: string, repoBranch: string, githubToken?: string }} contentEnv
+ */
+async function githubRaw(pathname, contentEnv) {
+  const url = `https://raw.githubusercontent.com/${contentEnv.repoOwner}/${contentEnv.repoName}/${contentEnv.repoBranch}/${pathname}`;
+  const res = await fetch(url, { headers: githubHeaders(contentEnv) });
   if (!res.ok) {
     throw new Error(`GitHub raw fetch failed ${res.status}: ${res.statusText}`);
   }
@@ -43,24 +71,43 @@ function readLocalText(filePath) {
   return fs.readFileSync(filePath, 'utf-8');
 }
 
-async function readTextFile(filePath) {
-  if (useGitHub) {
+/**
+ * @param {string} filePath
+ * @param {RuntimeEnv | undefined} runtimeEnv
+ */
+async function readTextFile(filePath, runtimeEnv = undefined) {
+  const contentEnv = resolveContentEnv(runtimeEnv);
+
+  if (isGitHubEnabled(contentEnv)) {
     try {
-      return await githubRaw(filePath);
+      return await githubRaw(filePath, contentEnv);
     } catch (error) {
-      const apiData = await githubApi(filePath);
+      const apiData = await githubApi(filePath, contentEnv);
       if (apiData && typeof apiData.content === 'string') {
         return Buffer.from(apiData.content, 'base64').toString('utf-8');
       }
       throw error;
     }
   }
+
+  if (runtimeEnv) {
+    throw new Error(
+      'Cloudflare runtime requires CONTENT_REPO_OWNER and CONTENT_REPO_NAME to load dynamic content.'
+    );
+  }
+
   return readLocalText(localPath(filePath));
 }
 
-async function listDirectoryFiles(dirPath) {
-  if (useGitHub) {
-    const entries = await githubApi(dirPath);
+/**
+ * @param {string} dirPath
+ * @param {RuntimeEnv | undefined} runtimeEnv
+ */
+async function listDirectoryFiles(dirPath, runtimeEnv = undefined) {
+  const contentEnv = resolveContentEnv(runtimeEnv);
+
+  if (isGitHubEnabled(contentEnv)) {
+    const entries = await githubApi(dirPath, contentEnv);
     if (!Array.isArray(entries)) {
       throw new Error(`GitHub directory listing did not return an array for ${dirPath}`);
     }
@@ -84,9 +131,15 @@ function getSlugFromFileName(name) {
   return name.replace(/\.md$/, '');
 }
 
-async function loadMarkdownItem(file) {
-  const filePath = file.path || file.download_url;
-  const content = useGitHub && file.download_url ? await fetch(file.download_url).then((res) => res.text()) : await readTextFile(file.path);
+/**
+ * @param {{ name: string, path: string, download_url?: string | null }} file
+ * @param {RuntimeEnv | undefined} runtimeEnv
+ */
+async function loadMarkdownItemWithEnv(file, runtimeEnv = undefined) {
+  const contentEnv = resolveContentEnv(runtimeEnv);
+  const content = isGitHubEnabled(contentEnv) && file.download_url
+    ? await fetch(file.download_url).then((res) => res.text())
+    : await readTextFile(file.path, runtimeEnv);
   const { data, content: body } = matter(content);
   return {
     slug: getSlugFromFileName(file.name),
@@ -95,46 +148,63 @@ async function loadMarkdownItem(file) {
   };
 }
 
-export async function getSiteConfig() {
-  const configText = await readTextFile('src/content/config.json');
+/**
+ * @param {RuntimeEnv | undefined} runtimeEnv
+ */
+export async function getSiteConfig(runtimeEnv = undefined) {
+  const configText = await readTextFile('src/content/config.json', runtimeEnv);
   return JSON.parse(configText);
 }
 
-export async function listFooterPages() {
-  const files = await listDirectoryFiles('src/content/pages');
+/**
+ * @param {RuntimeEnv | undefined} runtimeEnv
+ */
+export async function listFooterPages(runtimeEnv = undefined) {
+  const files = await listDirectoryFiles('src/content/pages', runtimeEnv);
   const pages = [];
   for (const file of files) {
-    const markdown = await loadMarkdownItem(file);
+    const markdown = await loadMarkdownItemWithEnv(file, runtimeEnv);
     pages.push({ slug: markdown.slug, title: markdown.data.title || markdown.slug });
   }
   return pages;
 }
 
-export async function listProducts() {
-  const files = await listDirectoryFiles('src/content/products');
+/**
+ * @param {RuntimeEnv | undefined} runtimeEnv
+ */
+export async function listProducts(runtimeEnv = undefined) {
+  const files = await listDirectoryFiles('src/content/products', runtimeEnv);
   const products = [];
   for (const file of files) {
-    const markdown = await loadMarkdownItem(file);
+    const markdown = await loadMarkdownItemWithEnv(file, runtimeEnv);
     products.push({ slug: markdown.slug, data: markdown.data });
   }
   return products;
 }
 
-export async function getPageBySlug(slug) {
-  const files = await listDirectoryFiles('src/content/pages');
+/**
+ * @param {string} slug
+ * @param {RuntimeEnv | undefined} runtimeEnv
+ */
+export async function getPageBySlug(slug, runtimeEnv = undefined) {
+  const files = await listDirectoryFiles('src/content/pages', runtimeEnv);
   for (const file of files) {
     if (getSlugFromFileName(file.name) === slug) {
-      return await loadMarkdownItem(file);
+      return await loadMarkdownItemWithEnv(file, runtimeEnv);
     }
   }
   return null;
 }
 
-export async function getProductBySlug(slug) {
-  const files = await listDirectoryFiles('src/content/products');
+/**
+ * @param {string} slug
+ * @param {RuntimeEnv | undefined} runtimeEnv
+ */
+export async function getProductBySlug(slug, runtimeEnv = undefined) {
+  const files = await listDirectoryFiles('src/content/products', runtimeEnv);
   for (const file of files) {
     if (getSlugFromFileName(file.name) === slug) {
-      return await loadMarkdownItem(file);
+      return await loadMarkdownItemWithEnv(file, runtimeEnv);
     }
   }
   return null;

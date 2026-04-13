@@ -1,0 +1,12 @@
+CONTENT_REPO_OWNER=your-github-owner
+CONTENT_REPO_NAME=your-content-repo
+CONTENT_REPO_BRANCH=main
+GITHUB_TOKEN=your_github_token
+
+CMS_GITHUB_REPO=your-github-owner/your-content-repo
+CMS_BRANCH=main
+CMS_OAUTH_BASE_URL=https://your-oauth-proxy.example.com
+CMS_AUTH_ENDPOINT=auth
+CMS_SITE_DOMAIN=your-project.pages.dev
+
+PUBLIC_SITE_URL=https://your-project.pages.dev
