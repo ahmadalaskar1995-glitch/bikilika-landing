@@ -1,5 +1,6 @@
 ---
 import { getSiteConfig, listProducts, listFooterPages } from '../lib/content.js';
+import { renderMarkdown } from '../lib/markdown.js';
 
 export const prerender = false;
 
@@ -8,7 +9,15 @@ const config = await getSiteConfig(runtimeEnv);
 const products = await listProducts(runtimeEnv);
 let footerPages = await listFooterPages(runtimeEnv);
 const analyticsWorkspaceId = import.meta.env.PUBLIC_LITLYX_WORKSPACE_ID;
+
+// تحويل الأوصاف إلى HTML
+const productsWithHtml = await Promise.all(products.map(async (p) => {
+  const html = await renderMarkdown(p.data.description || '', { siteTitle: config.siteTitle });
+  return { ...p, descriptionHtml: html };
+}));
+
 footerPages = footerPages.filter(p => p.slug && p.title)
+
   .sort((a, b) => {
     const order = ['about-us', 'privacy-policy', 'contact-us'];
     return order.indexOf(a.slug) - order.indexOf(b.slug);
@@ -25,7 +34,8 @@ footerPages = footerPages.filter(p => p.slug && p.title)
   <script>
     if (typeof window !== 'undefined') {
       const hash = window.location.hash;
-      if ((hash.includes('invite_token') || hash.includes('recovery_token')) && !window.location.pathname.startsWith('/admin')) {
+            if (products.length > 1 && (hash.includes('invite_token') || hash.includes('recovery_token'))) {
+
         window.location.href = `/admin/${hash}`;
       }
     }
@@ -616,7 +626,7 @@ footerPages = footerPages.filter(p => p.slug && p.title)
           <section class="hero-slider-section">
             <div class="slider-viewport" id="hero-slider">
               <div class="slider-track" id="slider-track">
-                {products.map((product) => {
+                                {productsWithHtml.map((product) => {
                   const firstImage = product.data.images?.[0] || product.data.image || null;
                   return (
                     <div class="slider-slide">
@@ -633,7 +643,7 @@ footerPages = footerPages.filter(p => p.slug && p.title)
                         <div class="product-info-hero">
                           <h2 class="product-title-hero">{product.data.title}</h2>
                           <div class="product-price-hero">{product.data.price}</div>
-                          <p class="product-desc-hero">{product.data.description || 'منتج مميز بجودة عالية'}</p>
+                          <div class="product-desc-hero" set:html={product.descriptionHtml || 'منتج مميز بجودة عالية'} />
                           <a href={product.data.bikilikaLink} class="btn-buy-hero" target="_blank" rel="noopener" data-product={product.data.title}>
                             🛒 اشتر الآن
                           </a>
@@ -642,6 +652,7 @@ footerPages = footerPages.filter(p => p.slug && p.title)
                     </div>
                   );
                 })}
+
               </div>
             </div>
 

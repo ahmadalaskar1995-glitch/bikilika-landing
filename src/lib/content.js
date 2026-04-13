@@ -1,8 +1,5 @@
-import fs from 'fs';
-import path from 'path';
 import matter from 'gray-matter';
 
-const localRoot = process.cwd();
 /** @typedef {Record<string, string | undefined>} RuntimeEnv */
 
 /**
@@ -63,14 +60,6 @@ async function githubRaw(pathname, contentEnv) {
   return res.text();
 }
 
-function localPath(...segments) {
-  return path.join(localRoot, ...segments);
-}
-
-function readLocalText(filePath) {
-  return fs.readFileSync(filePath, 'utf-8');
-}
-
 /**
  * @param {string} filePath
  * @param {RuntimeEnv | undefined} runtimeEnv
@@ -90,13 +79,18 @@ async function readTextFile(filePath, runtimeEnv = undefined) {
     }
   }
 
+  // في بيئة Cloudflare يجب دائماً استخدام GitHub
   if (runtimeEnv) {
     throw new Error(
       'Cloudflare runtime requires CONTENT_REPO_OWNER and CONTENT_REPO_NAME to load dynamic content.'
     );
   }
 
-  return readLocalText(localPath(filePath));
+  // تحذير: هذا الكود سيعمل فقط في بيئة Node.js المحلية أثناء التطوير
+  // سنقوم باستيراد fs ديناميكياً لتجنب مشاكل Build في Cloudflare
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+  return fs.readFileSync(path.join(process.cwd(), filePath), 'utf-8');
 }
 
 /**
@@ -114,7 +108,13 @@ async function listDirectoryFiles(dirPath, runtimeEnv = undefined) {
     return entries.filter((entry) => entry.type === 'file' && entry.name.endsWith('.md'));
   }
 
-  const dir = localPath(dirPath);
+  if (runtimeEnv) {
+    throw new Error('Cloudflare runtime requires GitHub config for directory listing.');
+  }
+
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+  const dir = path.join(process.cwd(), dirPath);
   if (!fs.existsSync(dir)) {
     return [];
   }
@@ -126,6 +126,7 @@ async function listDirectoryFiles(dirPath, runtimeEnv = undefined) {
       download_url: null,
     }));
 }
+// ... existing code ...
 
 function getSlugFromFileName(name) {
   return name.replace(/\.md$/, '');
